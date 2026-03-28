@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, FileText, Users, AlertCircle, Upload, File, Trash2 } from 'lucide-react';
+import { X, Calendar, FileText, Users, AlertCircle, Upload, File, Trash2, Loader2 } from 'lucide-react';
 import { useApp } from '../AppContext';
-import { Attachment } from '../types';
+import { DepartmentPlan } from '../types';
 
 interface CreatePlanModalProps {
   isOpen: boolean;
@@ -22,6 +22,7 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({ isOpen, onClos
   });
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -50,45 +51,41 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({ isOpen, onClos
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Mock converting Files to our Attachment type
-    const mockAttachments: Attachment[] = attachments.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      url: '#', // In a real app, this would be the uploaded file URL
-      version: 'v1.0',
-      uploadedBy: currentUser.id,
-      uploadedAt: new Date().toISOString(),
-    }));
-
-    addDeptPlan({
-      title: formData.title,
-      description: formData.description,
-      departmentId: formData.departmentId,
-      createdBy: currentUser.id,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      status: 'pending',
-      priority: formData.priority,
-      attachments: mockAttachments,
-      companyPlanId: 'cp1', // Defaulting to a company plan for demo
-    } as any);
-    
-    onClose();
-    // Reset form
-    setFormData({
-      title: '',
-      description: '',
-      departmentId: currentUser.departmentId || '',
-      startDate: '',
-      endDate: '',
-      priority: 'medium',
-    });
-    setAttachments([]);
+    try {
+      await addDeptPlan({
+        title: formData.title,
+        description: formData.description,
+        departmentId: formData.departmentId,
+        createdBy: currentUser.id,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        deadline: formData.endDate, // Using endDate as deadline
+        status: 'pending',
+        priority: formData.priority,
+        companyPlanId: 'cp1', // Defaulting to a company plan for demo
+        files: attachments
+      });
+      
+      onClose();
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        departmentId: currentUser.departmentId || '',
+        startDate: '',
+        endDate: '',
+        priority: 'medium',
+      });
+      setAttachments([]);
+    } catch (error) {
+      console.error('Error creating plan:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -284,9 +281,17 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({ isOpen, onClos
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary px-6 py-2"
+                  disabled={isSubmitting}
+                  className="btn-primary px-6 py-2 flex items-center gap-2"
                 >
-                  Tạo kế hoạch
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    'Tạo kế hoạch'
+                  )}
                 </button>
               </div>
             </form>

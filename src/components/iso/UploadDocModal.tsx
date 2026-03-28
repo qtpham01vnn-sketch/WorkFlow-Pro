@@ -5,7 +5,7 @@ import { extractTextFromFile } from '../../services/extractionService';
 
 interface UploadDocModalProps {
   onClose: () => void;
-  onUpload: (data: any) => void;
+  onUpload: (data: any) => Promise<void>;
 }
 
 export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUpload }) => {
@@ -20,6 +20,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -36,11 +37,11 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
     setIsExtracting(true);
     try {
       const contentText = await extractTextFromFile(selectedFile);
-      onUpload({
+      setIsExtracting(false);
+      setIsUploading(true);
+      await onUpload({
         ...formData,
-        fileUrl: URL.createObjectURL(selectedFile), // In real app, upload to Supabase Storage first
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size,
+        file: selectedFile,
         contentText
       });
     } catch (error) {
@@ -48,6 +49,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
       alert('Có lỗi xảy ra khi xử lý file');
     } finally {
       setIsExtracting(false);
+      setIsUploading(false);
     }
   };
 
@@ -56,7 +58,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
       <div className="glass-card w-full max-w-md p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Tải lên tài liệu ISO mới</h2>
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-text-secondary">
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-text-secondary" disabled={isExtracting || isUploading}>
             <X size={20} />
           </button>
         </div>
@@ -71,6 +73,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
               className="glass-input w-full"
               value={formData.code}
               onChange={e => setFormData({...formData, code: e.target.value})}
+              disabled={isExtracting || isUploading}
             />
           </div>
           <div className="space-y-1">
@@ -80,6 +83,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
               className="glass-input w-full"
               value={formData.title}
               onChange={e => setFormData({...formData, title: e.target.value})}
+              disabled={isExtracting || isUploading}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -89,6 +93,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
                 className="glass-input w-full"
                 value={formData.category}
                 onChange={e => setFormData({...formData, category: e.target.value as any})}
+                disabled={isExtracting || isUploading}
               >
                 <option value="quy_trinh">Quy trình</option>
                 <option value="bieu_mau">Biểu mẫu</option>
@@ -103,6 +108,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
                 className="glass-input w-full"
                 value={formData.standard}
                 onChange={e => setFormData({...formData, standard: e.target.value})}
+                disabled={isExtracting || isUploading}
               >
                 <option value="ISO 9001:2015">ISO 9001:2015</option>
                 <option value="ISO 14001:2015">ISO 14001:2015</option>
@@ -118,6 +124,7 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
               className="glass-input w-full"
               value={formData.nextReviewDate}
               onChange={e => setFormData({...formData, nextReviewDate: e.target.value})}
+              disabled={isExtracting || isUploading}
             />
           </div>
           <div className="relative">
@@ -127,10 +134,11 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
               className="hidden" 
               onChange={handleFileChange}
               accept=".pdf,.docx,.xlsx,.xls,.txt"
+              disabled={isExtracting || isUploading}
             />
             <label 
               htmlFor="file-upload"
-              className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-lg p-6 cursor-pointer hover:border-primary/50 transition-all bg-white/5"
+              className={`flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-lg p-6 transition-all bg-white/5 ${isExtracting || isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-primary/50'}`}
             >
               <FileUp className="text-text-muted mb-2" />
               <span className="text-sm text-text-secondary text-center">
@@ -141,16 +149,21 @@ export const UploadDocModal: React.FC<UploadDocModalProps> = ({ onClose, onUploa
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-4">
-          <button onClick={onClose} className="text-text-secondary" disabled={isExtracting}>Hủy</button>
+          <button onClick={onClose} className="text-text-secondary" disabled={isExtracting || isUploading}>Hủy</button>
           <button 
             onClick={handleSubmit}
-            disabled={isExtracting || !selectedFile || !formData.code || !formData.title}
+            disabled={isExtracting || isUploading || !selectedFile || !formData.code || !formData.title}
             className="btn-primary px-4 py-2 flex items-center gap-2"
           >
             {isExtracting ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
                 Đang xử lý AI...
+              </>
+            ) : isUploading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Đang lưu...
               </>
             ) : (
               'Tải lên & Tạo nháp'

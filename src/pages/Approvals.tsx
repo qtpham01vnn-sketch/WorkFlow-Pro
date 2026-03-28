@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, MessageSquare, FileText, History, User } from 'lucide-react';
+import { Check, X, MessageSquare, FileText, History, User, Loader2 } from 'lucide-react';
 import { useApp } from '@/AppContext';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatDate, cn } from '@/lib/utils';
@@ -9,15 +9,23 @@ export const Approvals = () => {
   const { deptPlans, departments, users, updatePlanStatus, currentUser } = useApp();
   const [selectedPlanId, setSelectedPlanId] = React.useState<string | null>(null);
   const [comment, setComment] = React.useState('');
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const pendingPlans = deptPlans.filter(p => p.status === 'pending');
   const selectedPlan = deptPlans.find(p => p.id === selectedPlanId);
 
-  const handleAction = (status: 'approved' | 'rejected') => {
+  const handleAction = async (status: 'approved' | 'rejected') => {
     if (!selectedPlanId) return;
-    updatePlanStatus(selectedPlanId, status, comment);
-    setSelectedPlanId(null);
-    setComment('');
+    setIsProcessing(true);
+    try {
+      await updatePlanStatus(selectedPlanId, status, comment);
+      setSelectedPlanId(null);
+      setComment('');
+    } catch (error) {
+      console.error('Error updating plan status:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (currentUser.role !== 'director' && currentUser.role !== 'admin') {
@@ -86,15 +94,19 @@ export const Approvals = () => {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => handleAction('rejected')}
+                    disabled={isProcessing}
                     className="btn-secondary text-error border-error/20 hover:bg-error/10 flex items-center gap-2"
                   >
-                    <X size={18} /> Từ chối
+                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <X size={18} />} 
+                    Từ chối
                   </button>
                   <button 
                     onClick={() => handleAction('approved')}
+                    disabled={isProcessing}
                     className="btn-primary flex items-center gap-2"
                   >
-                    <Check size={18} /> Phê duyệt
+                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} 
+                    Phê duyệt
                   </button>
                 </div>
               </div>

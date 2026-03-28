@@ -33,6 +33,7 @@ export const ISODocuments: React.FC = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isISOAdmin = currentUser.role === 'admin' || currentUser.role === 'director';
 
@@ -49,6 +50,58 @@ export const ISODocuments: React.FC = () => {
       alert('Có lỗi xảy ra khi gửi email.');
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const handleUpdateStatus = async (docId: string, status: ISODocStatus) => {
+    setIsProcessing(true);
+    try {
+      await updateISODocumentStatus(docId, status);
+      setSelectedDoc(prev => prev ? { ...prev, status } : null);
+    } catch (error) {
+      alert('Có lỗi xảy ra khi cập nhật trạng thái tài liệu.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn lưu trữ tài liệu này? Tài liệu sẽ không còn xuất hiện trong danh sách chính.')) return;
+    
+    setIsProcessing(true);
+    try {
+      await deleteISODocument(docId);
+      setSelectedDoc(null);
+    } catch (error) {
+      alert('Có lỗi xảy ra khi lưu trữ tài liệu.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpload = async (data: any) => {
+    setIsProcessing(true);
+    try {
+      await addISODocument(data);
+      setShowUploadModal(false);
+    } catch (error) {
+      alert('Có lỗi xảy ra khi tải lên tài liệu.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateVersion = async (file: File, version: string, note?: string, contentText?: string) => {
+    if (!selectedDoc) return;
+    setIsProcessing(true);
+    try {
+      await updateISODocumentVersion(selectedDoc.id, file, version, note, contentText);
+      setShowVersionModal(false);
+      setSelectedDoc(null);
+    } catch (error) {
+      alert('Có lỗi xảy ra khi cập nhật phiên bản tài liệu.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -226,20 +279,22 @@ export const ISODocuments: React.FC = () => {
                     <>
                       {selectedDoc.status === 'draft' && (
                         <button 
-                          onClick={() => updateISODocumentStatus(selectedDoc.id, 'reviewing')}
-                          className="px-4 py-2 rounded-lg bg-warning/20 border border-warning/30 text-warning hover:bg-warning/30 transition-all flex items-center gap-2"
+                          onClick={() => handleUpdateStatus(selectedDoc.id, 'reviewing')}
+                          disabled={isProcessing}
+                          className="px-4 py-2 rounded-lg bg-warning/20 border border-warning/30 text-warning hover:bg-warning/30 transition-all flex items-center gap-2 disabled:opacity-50"
                         >
-                          <Eye size={18} />
+                          {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Eye size={18} />}
                           Gửi xem xét
                         </button>
                       )}
                       
                       {selectedDoc.status === 'reviewing' && (
                         <button 
-                          onClick={() => updateISODocumentStatus(selectedDoc.id, 'published')}
-                          className="px-4 py-2 rounded-lg bg-success/20 border border-success/30 text-success hover:bg-success/30 transition-all flex items-center gap-2"
+                          onClick={() => handleUpdateStatus(selectedDoc.id, 'published')}
+                          disabled={isProcessing}
+                          className="px-4 py-2 rounded-lg bg-success/20 border border-success/30 text-success hover:bg-success/30 transition-all flex items-center gap-2 disabled:opacity-50"
                         >
-                          <FileCheck size={18} />
+                          {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <FileCheck size={18} />}
                           Phê duyệt & Ban hành
                         </button>
                       )}
@@ -247,7 +302,8 @@ export const ISODocuments: React.FC = () => {
                       {selectedDoc.status === 'published' && (
                         <button 
                           onClick={() => setShowVersionModal(true)}
-                          className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center gap-2"
+                          disabled={isProcessing}
+                          className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center gap-2 disabled:opacity-50"
                         >
                           <FileUp size={18} />
                           Cập nhật phiên bản mới
@@ -255,15 +311,11 @@ export const ISODocuments: React.FC = () => {
                       )}
 
                       <button 
-                        onClick={() => {
-                          if (confirm('Bạn có chắc chắn muốn lưu trữ tài liệu này? Tài liệu sẽ không còn xuất hiện trong danh sách chính.')) {
-                            deleteISODocument(selectedDoc.id);
-                            setSelectedDoc(null);
-                          }
-                        }}
-                        className="px-4 py-2 rounded-lg bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-all flex items-center gap-2 ml-auto"
+                        onClick={() => handleDeleteDoc(selectedDoc.id)}
+                        disabled={isProcessing}
+                        className="px-4 py-2 rounded-lg bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-all flex items-center gap-2 ml-auto disabled:opacity-50"
                       >
-                        <Archive size={18} />
+                        {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Archive size={18} />}
                         Lưu trữ (Soft Delete)
                       </button>
                     </>
@@ -339,10 +391,7 @@ export const ISODocuments: React.FC = () => {
         {showUploadModal && (
           <UploadDocModal 
             onClose={() => setShowUploadModal(false)} 
-            onUpload={(data) => {
-              addISODocument(data);
-              setShowUploadModal(false);
-            }}
+            onUpload={handleUpload}
           />
         )}
       </AnimatePresence>
@@ -353,11 +402,7 @@ export const ISODocuments: React.FC = () => {
           <UpdateVersionModal 
             doc={selectedDoc}
             onClose={() => setShowVersionModal(false)}
-            onUpdate={(file, version, note, contentText) => {
-              updateISODocumentVersion(selectedDoc.id, file, version, note, contentText);
-              setShowVersionModal(false);
-              setSelectedDoc(null);
-            }}
+            onUpdate={handleUpdateVersion}
           />
         )}
       </AnimatePresence>

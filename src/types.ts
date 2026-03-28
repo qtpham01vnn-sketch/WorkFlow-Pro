@@ -39,6 +39,9 @@ export interface DepartmentPlan {
   title: string;
   description: string;
   deadline: string;
+  startDate?: string;
+  endDate?: string;
+  priority?: 'low' | 'medium' | 'high';
   tasks: PlanTask[];
   status: PlanStatus;
   currentVersion: string;
