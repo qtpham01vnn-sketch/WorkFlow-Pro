@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ISODocument } from "../types";
 
 export const askAIAboutISO = async (query: string, documents: ISODocument[]): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
   
   // Prepare context from documents that have contentText
   const context = documents
